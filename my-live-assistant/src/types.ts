@@ -94,10 +94,7 @@ export interface AppContextValue {
 // If using Electron's contextBridge for IPC
 // Define the shape of the API exposed from preload script
 export interface ElectronApi {
-  getMediaSources: () => Promise<{
-    audio: MediaSource[];
-    video: MediaSource[];
-  }>;
+  getDesktopSources: () => Promise<MediaSource[]>;
   getBackendPort: () => Promise<string>;
   // Add other IPC methods needed, e.g., related to window control
 }

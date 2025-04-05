@@ -1,6 +1,5 @@
 import React from "react";
-// Удаляем импорт CSS-файла
-// import "./LoadingIndicator.css";
+
 
 interface LoadingIndicatorProps {
   size?: "small" | "medium" | "large";

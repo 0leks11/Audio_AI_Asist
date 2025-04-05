@@ -298,20 +298,40 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // Синхронизация состояния и ошибки захвата из хука в состояние
   useEffect(() => {
     dispatch({ type: "SET_IS_CAPTURING", payload: mediaIsCapturing });
-  }, [mediaIsCapturing]);
+  }, [mediaIsCapturing, dispatch]);
+
   useEffect(() => {
     if (captureError !== state.capture.error)
       dispatch({ type: "SET_CAPTURE_ERROR", payload: captureError });
-  }, [captureError, state.capture.error]);
+  }, [captureError, state.capture.error, dispatch]);
+
   useEffect(() => {
     dispatch({ type: "SET_MEDIA_SOURCES_LOADING", payload: isLoadingSources });
-  }, [isLoadingSources]);
+  }, [isLoadingSources, dispatch]);
+
   useEffect(() => {
-    dispatch({
-      type: "SET_MEDIA_SOURCES",
-      payload: { audio: availableAudioSources, video: availableVideoSources },
+    // Добавляем лог ПЕРЕД диспатчем
+    console.log("[AppContext] Синхронизация источников из хука:", {
+      audio: availableAudioSources,
+      video: availableVideoSources,
     });
-  }, [availableAudioSources, availableVideoSources]);
+    // Добавим проверку, чтобы не диспатчить пустые массивы, если они уже такие (хотя это не должно мешать)
+    if (
+      availableAudioSources !== state.capture.availableAudioSources ||
+      availableVideoSources !== state.capture.availableVideoSources
+    ) {
+      dispatch({
+        type: "SET_MEDIA_SOURCES",
+        payload: { audio: availableAudioSources, video: availableVideoSources },
+      });
+    }
+  }, [
+    availableAudioSources,
+    availableVideoSources,
+    dispatch,
+    state.capture.availableAudioSources,
+    state.capture.availableVideoSources,
+  ]);
 
   // --- Эффект для управления процессом старта ---
   useEffect(() => {
@@ -400,7 +420,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     /* ... как раньше ... */
   }, []);
   const loadMediaSources = useCallback(async () => {
-    /* ... как раньше ... */
+    console.log("--- [AppContext] Вызов loadMediaSources ---");
+    if (typeof mediaLoadSources === "function") {
+      console.log("[AppContext] mediaLoadSources доступен, вызываем...");
+      try {
+        await mediaLoadSources();
+        console.log("[AppContext] mediaLoadSources выполнен успешно");
+      } catch (error) {
+        console.error("[AppContext] Ошибка в mediaLoadSources:", error);
+      }
+    } else {
+      console.error(
+        "[AppContext] mediaLoadSources не является функцией!",
+        mediaLoadSources
+      );
+    }
   }, [mediaLoadSources]);
   const selectSources = useCallback(
     (audioSourceId: string | null, videoSourceId: string | null) => {

@@ -1,6 +1,5 @@
 import React from "react";
-// Удаляем импорт CSS-файла
-// import "./ErrorDisplay.css";
+
 
 interface ErrorDisplayProps {
   message: string | null;

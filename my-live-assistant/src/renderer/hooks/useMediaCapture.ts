@@ -1,5 +1,22 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { MediaSource } from "../../types"; // Ensure this path is correct
+import { MediaSource } from "../../types"; // Убедитесь, что путь верный
+
+// Расширение типов MediaTrackConstraints для Electron
+declare global {
+  interface ElectronDesktopCapturerConstraints {
+    mandatory: {
+      chromeMediaSource: "desktop";
+      chromeMediaSourceId: string;
+    };
+  }
+
+  interface MediaTrackConstraints {
+    mandatory?: {
+      chromeMediaSource: string;
+      chromeMediaSourceId: string;
+    };
+  }
+}
 
 interface UseMediaCaptureOptions {
   onDataAvailable: (data: Blob) => void; // Callback for audio/video data chunks
@@ -74,73 +91,97 @@ export const useMediaCapture = ({
     [onError, stopCapture] // stopCapture is now stable and included
   );
 
+  // Эта версия loadSources уже использует enumerateDevices + getDesktopSources
   const loadSources = useCallback(async () => {
-    // Use optional chaining and check function existence
-    if (typeof window.electronAPI?.getMediaSources !== "function") {
-      // Use handleError for consistency
-      handleError(
-        "Electron API 'getMediaSources' not available. Check preload script."
-      );
-      return;
-    }
+    console.log("--- [Renderer] Вызов loadSources (v2) ---");
+    console.log(
+      "[Renderer] Проверка window.electronAPI:",
+      !!window.electronAPI
+    );
+
     setIsLoadingSources(true);
     setError(null); // Clear previous errors
+
+    let audioInputs: MediaSource[] = [];
+    let videoInputs: MediaSource[] = [];
+
     try {
-      console.log("Requesting media sources from main process...");
-      // Assuming getMediaSources returns { audio: MediaSource[], video: MediaSource[] }
-      const sources = await window.electronAPI.getMediaSources();
-      if (
-        !sources ||
-        !Array.isArray(sources.audio) ||
-        !Array.isArray(sources.video)
-      ) {
-        throw new Error(
-          "Invalid media sources format received from main process."
-        );
-      }
-      console.log("Received media sources:", sources);
-      setAvailableAudioSources(sources.audio);
-      // Filter video sources for screen or window types
-      setAvailableVideoSources(
-        sources.video.filter(
-          (s) => s.id.startsWith("screen:") || s.id.startsWith("window:")
-        )
+      // 1. Получаем аудио устройства через API браузера
+      console.log(
+        "[Renderer] Запрос navigator.mediaDevices.enumerateDevices..."
       );
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      console.log("[Renderer] Получены устройства:", devices);
+
+      audioInputs = devices
+        .filter((device) => device.kind === "audioinput")
+        .map((device) => ({
+          id: device.deviceId,
+          name: device.label || `Микрофон ${audioInputs.length + 1}`,
+        }));
+      console.log("[Renderer] Отфильтрованы аудио входы:", audioInputs);
+
+      // 2. Получаем desktop источники (экраны, окна) через Electron API
+      if (typeof window.electronAPI?.getDesktopSources === "function") {
+        console.log(
+          "[Renderer] Запрос window.electronAPI.getDesktopSources..."
+        );
+        const desktopSources = await window.electronAPI.getDesktopSources();
+        console.log("[Renderer] Получены desktop источники:", desktopSources);
+
+        videoInputs = desktopSources.map((source) => ({
+          id: source.id,
+          name: source.name,
+        }));
+        console.log(
+          "[Renderer] Отфильтрованы видео входы (desktop):",
+          videoInputs
+        );
+      } else {
+        console.warn(
+          "[Renderer] API 'getDesktopSources' не доступен в preload."
+        );
+        handleError("API для получения источников экрана не найден.");
+      }
+
+      // 3. Обновляем состояние
+      console.log("[Renderer] Установка состояния источников...");
+      setAvailableAudioSources(audioInputs);
+      setAvailableVideoSources(videoInputs);
+      console.log("[Renderer] Состояние источников установлено.");
     } catch (err) {
+      console.error(
+        "[Renderer] Ошибка при вызове или обработке источников:",
+        err
+      );
       const errorMsg =
         err instanceof Error
           ? err.message
-          : "Unknown error loading media sources";
+          : "Неизвестная ошибка при загрузке источников";
       handleError(`Failed to load media sources: ${errorMsg}`, err);
     } finally {
       setIsLoadingSources(false);
     }
-  }, [handleError]); // Dependency on handleError is correct
+  }, [handleError]);
 
   const startCapture = useCallback(
-    async (audioSourceId: string, videoSourceId: string) => {
+    async (audioDeviceId: string, videoSourceId: string) => {
+      // Используем audioDeviceId
       if (isCapturing) {
         console.warn("Capture is already in progress.");
         return;
       }
       console.log(
-        `Starting capture - Audio: ${audioSourceId}, Video: ${videoSourceId}`
+        `[Renderer] Starting capture - Audio DeviceID: ${audioDeviceId}, Video SourceID: ${videoSourceId}`
       );
-      setError(null); // Clear previous errors
-      setIsCapturing(true); // Set capturing state
+      setError(null);
+      setIsCapturing(true);
       recordedChunksRef.current = [];
 
       try {
-        // Build constraints using Electron's mandatory property for desktop capture
+        // Создаем объект constraints БЕЗ явной аннотации типа
         const constraints = {
-          audio: audioSourceId
-            ? {
-                mandatory: {
-                  chromeMediaSource: "desktop",
-                  chromeMediaSourceId: audioSourceId,
-                },
-              }
-            : false, // Set to false if no audio source selected
+          audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : false, // Используем deviceId
           video: videoSourceId
             ? {
                 mandatory: {
@@ -148,7 +189,7 @@ export const useMediaCapture = ({
                   chromeMediaSourceId: videoSourceId,
                 },
               }
-            : false, // Set to false if no video source selected
+            : false,
         };
 
         console.log(
@@ -156,18 +197,14 @@ export const useMediaCapture = ({
           JSON.stringify(constraints)
         );
 
-        // Get media stream using the constraints
-        // Use @ts-expect-error because 'mandatory' is not part of standard Web API types
-        // but is specific to Electron's desktopCapturer
+        // @ts-ignore - Electron's API uses non-standard 'mandatory' property
         mediaStreamRef.current =
-          // @ts-expect-error Electron's constraints use non-standard 'mandatory' property
           await navigator.mediaDevices.getUserMedia(constraints);
 
         // --- MediaRecorder Setup ---
-        // Determine the best mimeType, prioritizing Opus for audio efficiency
         let chosenMimeType: string | null = null;
         const preferredMimeType = "audio/webm;codecs=opus";
-        const fallbackMimeType = "audio/webm"; // Basic WebM audio as fallback
+        const fallbackMimeType = "audio/webm";
 
         if (MediaRecorder.isTypeSupported(preferredMimeType)) {
           chosenMimeType = preferredMimeType;
@@ -177,18 +214,14 @@ export const useMediaCapture = ({
           );
           chosenMimeType = fallbackMimeType;
         } else {
-          // If neither common audio webm format is supported, throw an error.
           throw new Error(
             `Neither '${preferredMimeType}' nor '${fallbackMimeType}' are supported by MediaRecorder.`
           );
         }
-
         console.log(`Using MediaRecorder mimeType: ${chosenMimeType}`);
         const options = { mimeType: chosenMimeType };
 
-        // Create MediaRecorder instance
         if (!mediaStreamRef.current) {
-          // Should not happen if getUserMedia succeeded, but check defensively
           throw new Error(
             "MediaStream is not available after getUserMedia success."
           );
@@ -198,25 +231,18 @@ export const useMediaCapture = ({
           options
         );
 
-        // Setup event listeners for the recorder
         mediaRecorderRef.current.ondataavailable = (event: BlobEvent) => {
           if (event.data.size > 0) {
-            // Call the callback with the data chunk
             onDataAvailable(event.data);
           }
         };
-
         mediaRecorderRef.current.onerror = (event: Event) => {
-          // Use the centralized error handler
           handleError("MediaRecorder encountered an error", event);
         };
-
         mediaRecorderRef.current.onstop = () => {
           console.log("MediaRecorder stopped successfully.");
-          // Additional cleanup related to recorder stopping can go here if needed
         };
 
-        // Start recording, triggering ondataavailable every 'timeslice' milliseconds
         mediaRecorderRef.current.start(timeslice);
         console.log(`MediaRecorder started with timeslice ${timeslice}ms`);
       } catch (err) {
@@ -224,24 +250,20 @@ export const useMediaCapture = ({
           err instanceof Error
             ? err.message
             : "Unknown error during capture start";
-        // Use the centralized error handler, which also calls stopCapture
         handleError(`Failed to start media capture: ${errorMsg}`, err);
-        // No need to call setIsCapturing(false) here, handleError -> stopCapture does it.
-        // No need to manually stop tracks here, handleError -> stopCapture does it.
       }
     },
-    [isCapturing, onDataAvailable, timeslice, handleError] // Dependencies seem correct
+    // Зависимости могут немного отличаться, но основные должны быть здесь
+    [isCapturing, onDataAvailable, timeslice, handleError]
   );
 
   // Effect for cleanup when the component unmounts or hook is removed
   useEffect(() => {
-    // Return the cleanup function
     return () => {
-      stopCapture(); // Ensure capture stops cleanly
+      stopCapture();
     };
-  }, [stopCapture]); // Dependency on stable stopCapture function
+  }, [stopCapture]);
 
-  // Return the state and functions for the consumer of the hook
   return {
     isCapturing,
     startCapture,

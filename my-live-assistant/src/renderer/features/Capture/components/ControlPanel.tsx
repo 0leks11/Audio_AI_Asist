@@ -34,6 +34,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   onLoadSources,
   onSelectSources,
 }) => {
+  // Логируем полученные пропсы источников
+  console.log("[ControlPanel] Полученные пропсы источников:", {
+    availableAudioSources,
+    availableVideoSources,
+  });
+
   // Use local state for dropdown selections before confirming
   const [localAudioId, setLocalAudioId] = useState<string | null>(
     selectedAudioSourceId
@@ -53,6 +59,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   // Load sources when the component mounts
   useEffect(() => {
+    console.log("--- [ControlPanel] useEffect для загрузки источников ---");
+    console.log(
+      "[ControlPanel] onLoadSources доступен:",
+      typeof onLoadSources === "function"
+    );
     onLoadSources();
   }, []);
 

@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   }> => {
     try {
       // Use desktopCapturer in the main process via IPC
-      const sources = await ipcRenderer.invoke("get-media-sources");
+      const sources = await ipcRenderer.invoke("get-desktop-sources");
       // Basic validation
       if (
         !sources ||
@@ -20,7 +20,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
       }
       return sources;
     } catch (error) {
-      console.error("Error invoking get-media-sources:", error);
+      console.error("Error invoking get-desktop-sources:", error);
       // Re-throw or return empty to indicate failure
       throw error; // Let the caller handle it
     }
