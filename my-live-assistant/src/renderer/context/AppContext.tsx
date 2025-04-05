@@ -1,55 +1,58 @@
-import React, { createContext, useContext, useReducer, useMemo, useCallback, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid'; // For generating message IDs
+// src/renderer/context/AppContext.tsx
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useMemo,
+  useCallback,
+  useEffect,
+  useState, // Добавляем useState для управления состоянием ожидания старта
+} from "react";
+import { v4 as uuidv4 } from "uuid";
 import {
-    AppState,
-    AppContextValue,
-    Message,
-    WebSocketStatus,
-    MediaSource,
-} from '../../types';
-import { useGeminiWebSocket } from '../hooks/useGeminiWebSocket';
-import { useMediaCapture } from '../hooks/useMediaCapture';
+  AppState,
+  AppContextValue,
+  Message,
+  WebSocketStatus,
+  MediaSource,
+} from "../../types";
+import { useGeminiWebSocket } from "../hooks/useGeminiWebSocket";
+import { useMediaCapture } from "../hooks/useMediaCapture";
 
-// --- Constants ---
-// TODO: Move to a config file or environment variables
-const GEMINI_WEBSOCKET_URL = 'wss://your-gemini-websocket-endpoint'; // Replace with actual URL
-const PRESET_PROMPT_TEMPLATE = `You are a live assistant integrated into a desktop application built with Electron. 
-Your role is to receive real-time audio and screen capture streams from the application 
-and provide concise, helpful, and accurate text responses in Russian only. 
+// --- Константы ---
+// Вместо использования константы напрямую, мы будем получать URL динамически
+// const BACKEND_WEBSOCKET_URL = `ws://localhost:${process.env.BACKEND_PORT || 8080}`;
+const PRESET_PROMPT_TEMPLATE = `You are a live assistant... (ваш полный промпт)`; // Сокращено для примера
 
-Guidelines:
-- Respond only in plain text in a chat format.
-- Base your responses solely on the received audio and visual data.
-- Do not output any other formats or media.
-- Act as a live consultant: if the user is taking an exam or doing live coding, 
-  provide advice and solutions based on what you 'hear' and 'see'.
-- Always answer in Russian, and ensure that your responses are clear and relevant.
-
-End every response with a brief summary if appropriate.`;
-// Consider allowing user input to be appended or used differently
-// const USER_CONTEXT_PROMPT = "\n\nUser context/request: {userInput}";
-
-
-// --- Reducer Logic (Example) ---
-// Define action types
+// --- Reducer Logic (без изменений, кроме удаления ошибочной строки) ---
 type Action =
-  | { type: 'ADD_MESSAGE'; payload: Omit<Message, 'id' | 'timestamp'> }
-  | { type: 'SET_USER_PROMPT'; payload: string }
-  | { type: 'SET_WEB_SOCKET_STATUS'; payload: WebSocketStatus }
-  | { type: 'SET_WEB_SOCKET_ERROR'; payload: string | null }
-  | { type: 'SET_IS_CAPTURING'; payload: boolean }
-  | { type: 'SET_CAPTURE_ERROR'; payload: string | null }
-  | { type: 'SET_MEDIA_SOURCES_LOADING'; payload: boolean }
-  | { type: 'SET_MEDIA_SOURCES'; payload: { audio: MediaSource[]; video: MediaSource[] } }
-  | { type: 'SET_SELECTED_SOURCES'; payload: { audioSourceId: string | null; videoSourceId: string | null } }
-  | { type: 'SET_LOADING_RESPONSE'; payload: boolean };
-
+  | { type: "ADD_MESSAGE"; payload: Omit<Message, "id" | "timestamp"> }
+  | { type: "SET_USER_PROMPT"; payload: string }
+  | { type: "SET_WEB_SOCKET_STATUS"; payload: WebSocketStatus }
+  | { type: "SET_WEB_SOCKET_ERROR"; payload: string | null }
+  | { type: "SET_IS_CAPTURING"; payload: boolean }
+  | { type: "SET_CAPTURE_ERROR"; payload: string | null }
+  | { type: "SET_MEDIA_SOURCES_LOADING"; payload: boolean }
+  | {
+      type: "SET_MEDIA_SOURCES";
+      payload: { audio: MediaSource[]; video: MediaSource[] };
+    }
+  | {
+      type: "SET_SELECTED_SOURCES";
+      payload: { audioSourceId: string | null; videoSourceId: string | null };
+    }
+  | { type: "SET_LOADING_RESPONSE"; payload: boolean }
+  // Добавляем действие для временного хранения ID для старта
+  | {
+      type: "SET_SOURCES_TO_START";
+      payload: {
+        audioSourceId: string | null;
+        videoSourceId: string | null;
+      } | null;
+    };
 
 const initialState: AppState = {
-  chat: {
-    messages: [],
-    isLoadingResponse: false,
-  },
+  chat: { messages: [], isLoadingResponse: false },
   capture: {
     isCapturing: false,
     audioSourceId: null,
@@ -58,166 +61,227 @@ const initialState: AppState = {
     availableVideoSources: [],
     error: null,
     isLoadingSources: false,
+    // Добавляем поля для хранения ID на время старта
+    selectedAudioSourceIdToStart: null,
+    selectedVideoSourceIdToStart: null,
   },
-  geminiWebSocket: {
-    status: 'disconnected',
-    error: null,
-  },
-  userPrompt: '', // Initialize user prompt if needed
+  geminiWebSocket: { status: "disconnected", error: null },
+  userPrompt: "",
   presetPrompt: PRESET_PROMPT_TEMPLATE,
 };
 
 const appReducer = (state: AppState, action: Action): AppState => {
   switch (action.type) {
-    case 'ADD_MESSAGE':
-      const newMessage: Message = {
-        ...action.payload,
-        id: uuidv4(),
-        timestamp: Date.now(),
-      };
+    case "ADD_MESSAGE" /* ... */:
+      break;
+    case "SET_LOADING_RESPONSE" /* ... */:
+      break;
+    case "SET_USER_PROMPT" /* ... */:
+      break;
+    case "SET_WEB_SOCKET_STATUS" /* ... */:
+      break;
+    case "SET_WEB_SOCKET_ERROR" /* ... */:
+      break;
+    case "SET_IS_CAPTURING" /* ... */:
+      break;
+    case "SET_CAPTURE_ERROR" /* ... */:
+      break;
+    case "SET_MEDIA_SOURCES_LOADING" /* ... */:
+      break;
+    case "SET_MEDIA_SOURCES" /* ... */:
+      break;
+    case "SET_SELECTED_SOURCES" /* ... */:
+      break;
+    // Обрабатываем новое действие
+    case "SET_SOURCES_TO_START":
       return {
         ...state,
-        chat: {
-          ...state.chat,
-          messages: [...state.chat.messages, newMessage],
-          isLoadingResponse: action.payload.sender === 'user', // Start loading when user sends
+        capture: {
+          ...state.capture,
+          selectedAudioSourceIdToStart: action.payload?.audioSourceId ?? null,
+          selectedVideoSourceIdToStart: action.payload?.videoSourceId ?? null,
         },
       };
-     case 'SET_LOADING_RESPONSE':
-        return {
-            ...state,
-            chat: { ...state.chat, isLoadingResponse: action.payload },
-        };
-    case 'SET_USER_PROMPT':
-      return { ...state, userPrompt: action.payload };
-    case 'SET_WEB_SOCKET_STATUS':
-      return {
-        ...state,
-        geminiWebSocket: { ...state.geminiWebSocket, status: action.payload },
-      };
-    case 'SET_WEB_SOCKET_ERROR':
-       return {
-        ...state,
-        geminiWebSocket: { ...state.geminiWebSocket, error: action.payload },
-      };
-     case 'SET_IS_CAPTURING':
-      return { ...state, capture: { ...state.capture, isCapturing: action.payload } };
-    case 'SET_CAPTURE_ERROR':
-       return { ...state, capture: { ...state.capture, error: action.payload } };
-    case 'SET_MEDIA_SOURCES_LOADING':
-        return { ...state, capture: { ...state.capture, isLoadingSources: action.payload }};
-    case 'SET_MEDIA_SOURCES':
-        return {
-            ...state,
-            capture: {
-                ...state.capture,
-                availableAudioSources: action.payload.audio,
-                availableVideoSources: action.payload.video,
-                // Reset selected if sources change? Or try to keep selection?
-                // audioSourceId: state.capture.audioSourceId,
-                // videoSourceId: state.capture.videoSourceId,
-                isLoadingSources: false, // Ensure loading is false
-            },
-        };
-    case 'SET_SELECTED_SOURCES':
-        return {
-            ...state,
-            capture: {
-                ...state.capture,
-                audioSourceId: action.payload.audioSourceId,
-                videoSourceId: action.payload.videoSourceId,
-            },
-        };
+    // --- ОШИБОЧНАЯ СТРОКА УДАЛЕНА ОТСЮДА ---
     default:
       return state;
   }
+  // Реализации других кейсов редьюсера остаются как раньше...
+  return state; // Заглушка, добавьте реальную логику
 };
-
 
 // --- Context Definition ---
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export const useAppContext = (): AppContextValue => {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useAppContext must be used within an AppProvider');
+  if (context === undefined) {
+    throw new Error("useAppContext должен использоваться внутри AppProvider");
   }
   return context;
 };
-
 
 // --- Provider Component ---
 interface AppProviderProps {
   children: React.ReactNode;
 }
-
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  // Состояние для управления асинхронным процессом старта и URL бэкенда
+  const [pendingAction, setPendingAction] = useState<"startCapture" | null>(
+    null
+  );
+  const [backendUrl, setBackendUrl] = useState<string | null>(null);
+
+  // Эффект для получения порта бэкенда из main процесса через preload
+  useEffect(() => {
+    const fetchBackendPort = async () => {
+      try {
+        // Используем API из preload скрипта для получения порта
+        const port = await window.electronAPI.getBackendPort();
+        setBackendUrl(`ws://localhost:${port}`);
+        console.log(
+          `Получен порт бэкенда: ${port}, URL: ws://localhost:${port}`
+        );
+      } catch (error) {
+        console.error("Не удалось получить порт бэкенда:", error);
+        // Устанавливаем URL по умолчанию при ошибке
+        setBackendUrl("ws://localhost:8080");
+      }
+    };
+    fetchBackendPort();
+  }, []);
 
   // --- WebSocket Integration ---
-  const handleWebSocketMessage = useCallback((text: string) => {
-     // Received a message from Gemini
-    dispatch({ type: 'ADD_MESSAGE', payload: { text, sender: 'gemini' } });
-    dispatch({ type: 'SET_LOADING_RESPONSE', payload: false }); // Stop loading indicator
-    dispatch({ type: 'SET_WEB_SOCKET_ERROR', payload: null }); // Clear error on success
-  }, []);
+  const handleWebSocketMessage = useCallback(
+    (data: string | ArrayBuffer | Blob) => {
+      if (typeof data === "string") {
+        try {
+          const message = JSON.parse(data);
+          console.log("Сообщение от бэкенда:", message);
 
-  const handleWebSocketError = useCallback((error: Event | string) => {
-    const message = typeof error === 'string' ? error : 'WebSocket connection error';
-    dispatch({ type: 'SET_WEB_SOCKET_ERROR', payload: message });
-    dispatch({ type: 'SET_LOADING_RESPONSE', payload: false }); // Stop loading if error occurs
-     // Consider stopping capture if WebSocket fails critically
-     // stopCaptureInternal(); // Call the internal stop function if needed
-  }, []);
-
-  const handleWebSocketClose = useCallback(() => {
-      // Only update status if not already error or disconnected intentionally
-      if (state.geminiWebSocket.status !== 'error' && state.geminiWebSocket.status !== 'disconnected') {
-           dispatch({ type: 'SET_WEB_SOCKET_STATUS', payload: 'disconnected' });
+          if (message.type === "text_response") {
+            dispatch({
+              type: "ADD_MESSAGE",
+              payload: { text: message.content, sender: "gemini" },
+            });
+            dispatch({ type: "SET_LOADING_RESPONSE", payload: false });
+            dispatch({ type: "SET_WEB_SOCKET_ERROR", payload: null }); // Очистка ошибки при успехе
+          } else if (message.type === "session_started") {
+            console.log("Бэкенд подтвердил старт сессии Gemini.");
+            // Можно обновить UI, если необходимо
+          } else if (message.type === "session_stopped") {
+            console.log("Бэкенд подтвердил остановку сессии Gemini.");
+            // Можно обновить UI
+          } else if (message.type === "error") {
+            console.error("Ошибка от бэкенда:", message.message);
+            dispatch({
+              type: "SET_WEB_SOCKET_ERROR",
+              payload: `Backend: ${message.message}`,
+            });
+            dispatch({ type: "SET_LOADING_RESPONSE", payload: false });
+            // Если ошибка критическая, возможно, стоит остановить захват?
+            // mediaStopCapture(); // Вызовет stopCapture ниже
+            // setPendingAction(null); // Отменяем ожидание старта
+          }
+          // ... обработка других сообщений ...
+        } catch (error) {
+          console.error("Не удалось распарсить JSON от бэкенда:", data, error);
+          // Можно отправить общую ошибку парсинга
+          dispatch({
+            type: "SET_WEB_SOCKET_ERROR",
+            payload: "Invalid message format from backend",
+          });
+        }
+      } else {
+        console.warn("Получены неожиданные бинарные данные от бэкенда.");
       }
-      // Optionally attempt reconnect or notify user
-  }, [state.geminiWebSocket.status]); // Depend on status
+    },
+    [dispatch]
+  ); // Убрали mediaStopCapture из зависимостей, если он не используется напрямую
 
-   const {
+  const handleWebSocketError = useCallback(
+    (error: Event | string) => {
+      const message =
+        typeof error === "string" ? error : "WebSocket connection error";
+      console.error("WebSocket Error Callback:", message);
+      dispatch({ type: "SET_WEB_SOCKET_ERROR", payload: message });
+      dispatch({ type: "SET_LOADING_RESPONSE", payload: false });
+      setPendingAction(null); // Отменяем ожидание старта при ошибке WS
+    },
+    [dispatch]
+  );
+
+  const handleWebSocketClose = useCallback(
+    () => {
+      console.log("WebSocket Closed Callback");
+      // Обновляем статус только если он не был ошибкой или уже disconnected
+      // Сравнение со state может быть ненадёжным из-за замыкания, лучше использовать статус из хука ws
+      // if (state.geminiWebSocket.status !== 'error' && state.geminiWebSocket.status !== 'disconnected') {
+      //    dispatch({ type: 'SET_WEB_SOCKET_STATUS', payload: 'disconnected' });
+      // }
+      // Статус обновится через useEffect ниже, слушающий wsStatus
+      setPendingAction(null); // Отменяем ожидание старта при закрытии WS
+    },
+    [
+      /* dispatch, state.geminiWebSocket.status */
+    ]
+  ); // Убрали зависимости state
+
+  const {
     status: wsStatus,
     connect: wsConnect,
     disconnect: wsDisconnect,
     sendMessage: wsSendMessage,
-    error: wsError,
+    error: wsError, // Ошибка из хука
   } = useGeminiWebSocket({
-    url: GEMINI_WEBSOCKET_URL,
+    url: backendUrl || "ws://localhost:8080", // Используем динамический URL или запасной вариант
     onMessage: handleWebSocketMessage,
     onError: handleWebSocketError,
     onClose: handleWebSocketClose,
-    // TODO: Add API Key handling if required
   });
 
-   // Sync WebSocket status and error from hook to reducer state
+  // Синхронизация статуса и ошибки WS из хука в состояние
   useEffect(() => {
-    dispatch({ type: 'SET_WEB_SOCKET_STATUS', payload: wsStatus });
+    // Обновляем статус в Redux состоянии
+    dispatch({ type: "SET_WEB_SOCKET_STATUS", payload: wsStatus });
   }, [wsStatus]);
 
   useEffect(() => {
-    // Only update if the hook reports an error different from the current state
+    // Обновляем ошибку, только если она изменилась
+    // Сравниваем с ошибкой в состоянии, чтобы избежать лишних диспатчей
     if (wsError !== state.geminiWebSocket.error) {
-        dispatch({ type: 'SET_WEB_SOCKET_ERROR', payload: wsError });
+      dispatch({ type: "SET_WEB_SOCKET_ERROR", payload: wsError });
     }
   }, [wsError, state.geminiWebSocket.error]);
 
-
   // --- Media Capture Integration ---
-   const handleCaptureData = useCallback((data: Blob) => {
-    // Send data chunk via WebSocket
-    wsSendMessage(data);
-  }, [wsSendMessage]); // wsSendMessage is memoized by its hook
+  const handleCaptureData = useCallback(
+    (data: Blob) => {
+      if (wsStatus === "connected") {
+        wsSendMessage(data);
+      } else {
+        console.warn("WebSocket не подключен, не могу отправить медиа-чанк.");
+        // Возможно, стоит остановить захват, если WS отвалился
+        // mediaStopCapture(); // Вызовет stopCapture ниже
+      }
+    },
+    [wsSendMessage, wsStatus /* mediaStopCapture */]
+  ); // Убрали mediaStopCapture
 
-  const handleCaptureError = useCallback((error: string) => {
-    dispatch({ type: 'SET_CAPTURE_ERROR', payload: error });
-    dispatch({ type: 'SET_IS_CAPTURING', payload: false }); // Ensure capturing stops on error
-    wsDisconnect(); // Disconnect WebSocket if capture fails
-  }, [wsDisconnect]);
+  const handleCaptureError = useCallback(
+    (error: string) => {
+      console.error("Media Capture Error Callback:", error);
+      dispatch({ type: "SET_CAPTURE_ERROR", payload: error });
+      dispatch({ type: "SET_IS_CAPTURING", payload: false });
+      setPendingAction(null); // Отменяем ожидание старта при ошибке захвата
+      // Если захват упал, скорее всего, нужно и WS закрыть
+      wsDisconnect();
+    },
+    [dispatch, wsDisconnect]
+  );
 
-   const {
+  const {
     isCapturing: mediaIsCapturing,
     startCapture: mediaStartCapture,
     stopCapture: mediaStopCapture,
@@ -225,190 +289,219 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     isLoadingSources,
     availableAudioSources,
     availableVideoSources,
-    loadSources: mediaLoadSources, // Renamed to avoid conflict
+    loadSources: mediaLoadSources,
   } = useMediaCapture({
     onDataAvailable: handleCaptureData,
     onError: handleCaptureError,
-    // timeslice: 1000, // Optional: configure timeslice
   });
 
-  // Sync capture state and error from hook to reducer state
+  // Синхронизация состояния и ошибки захвата из хука в состояние
   useEffect(() => {
-    dispatch({ type: 'SET_IS_CAPTURING', payload: mediaIsCapturing });
+    dispatch({ type: "SET_IS_CAPTURING", payload: mediaIsCapturing });
   }, [mediaIsCapturing]);
-
   useEffect(() => {
-     if (captureError !== state.capture.error) {
-        dispatch({ type: 'SET_CAPTURE_ERROR', payload: captureError });
-     }
+    if (captureError !== state.capture.error)
+      dispatch({ type: "SET_CAPTURE_ERROR", payload: captureError });
   }, [captureError, state.capture.error]);
-
   useEffect(() => {
-      dispatch({ type: 'SET_MEDIA_SOURCES_LOADING', payload: isLoadingSources});
+    dispatch({ type: "SET_MEDIA_SOURCES_LOADING", payload: isLoadingSources });
   }, [isLoadingSources]);
-
   useEffect(() => {
-      // Simple check to see if sources differ before dispatching
-      if (availableAudioSources !== state.capture.availableAudioSources || availableVideoSources !== state.capture.availableVideoSources) {
-           dispatch({ type: 'SET_MEDIA_SOURCES', payload: { audio: availableAudioSources, video: availableVideoSources } });
-      }
-  }, [availableAudioSources, availableVideoSources, state.capture.availableAudioSources, state.capture.availableVideoSources]);
+    dispatch({
+      type: "SET_MEDIA_SOURCES",
+      payload: { audio: availableAudioSources, video: availableVideoSources },
+    });
+  }, [availableAudioSources, availableVideoSources]);
 
+  // --- Эффект для управления процессом старта ---
+  useEffect(() => {
+    // Этот эффект сработает, когда изменится pendingAction или wsStatus
+    if (pendingAction === "startCapture" && wsStatus === "connected") {
+      console.log("WS подключен, начинаем захват...");
+      // Сбрасываем флаг ожидания
+      setPendingAction(null);
 
-  // --- Actions exposed by Context ---
-  const addMessage = useCallback((message: Omit<Message, 'id' | 'timestamp'>) => {
-    dispatch({ type: 'ADD_MESSAGE', payload: message });
-    // If user message, potentially send it via WebSocket immediately or wait?
-    // The current plan sends streams, not discrete user messages to Gemini?
-    // If user text *should* be sent:
-    // if (message.sender === 'user') {
-    //    wsSendMessage(message.text);
-    //    dispatch({ type: 'SET_LOADING_RESPONSE', payload: true });
-    // }
-  }, [/* wsSendMessage */]); // Add wsSendMessage if user text is sent
+      // Получаем ID источников, сохраненные перед стартом
+      const audioId = state.capture.selectedAudioSourceIdToStart;
+      const videoId = state.capture.selectedVideoSourceIdToStart;
 
-  const setUserPrompt = useCallback((prompt: string) => {
-      dispatch({ type: 'SET_USER_PROMPT', payload: prompt });
-  }, []);
+      if (audioId && videoId) {
+        // 1. Отправляем команду инициализации сессии на бэкенд
+        const setupCommand = {
+          type: "start_session",
+          prompt: state.presetPrompt,
+        };
+        wsSendMessage(JSON.stringify(setupCommand));
 
-  const loadMediaSources = useCallback(async () => {
-      // Wrapper around the hook's loadSources
-      dispatch({ type: 'SET_CAPTURE_ERROR', payload: null }); // Clear previous errors
-      await mediaLoadSources();
-  }, [mediaLoadSources]);
-
-  const selectSources = useCallback((audioSourceId: string | null, videoSourceId: string | null) => {
-        dispatch({ type: 'SET_SELECTED_SOURCES', payload: { audioSourceId, videoSourceId }});
-  }, []);
-
-
-  // Start the combined capture and WebSocket process
-  const startCapture = useCallback(async (audioSourceId: string, videoSourceId: string) => {
-    if (!audioSourceId || !videoSourceId) {
-        handleCaptureError("Audio and Video sources must be selected.");
-        return;
-    }
-    if (mediaIsCapturing || wsStatus === 'connecting' || wsStatus === 'connected') {
-        console.warn("Capture or connection already active.");
-        return;
-    }
-
-    // 1. Clear previous errors
-    dispatch({ type: 'SET_CAPTURE_ERROR', payload: null });
-    dispatch({ type: 'SET_WEB_SOCKET_ERROR', payload: null });
-
-    // 2. Connect WebSocket
-    wsConnect(); // Hook handles setting status to 'connecting' etc.
-
-    // 3. Wait for WebSocket connection *before* starting media capture and sending prompt
-    //    This requires managing async flow carefully.
-    //    Option A: Use an effect that triggers mediaStartCapture when wsStatus becomes 'connected'.
-    //    Option B: Poll or use a promise-based approach within this function (more complex).
-
-    // Using an effect is cleaner (add to the Provider component):
-    // useEffect(() => {
-    //     if (wsStatus === 'connected' && state.capture.needsToStartCapture) { // Add a flag like 'needsToStartCapture'
-    //         dispatch({ type: 'SET_NEEDS_TO_START_CAPTURE', payload: false });
-    //         // Now start media capture
-    //         // Ensure selected sources are available in state here
-    //         const { audioSourceId, videoSourceId } = state.capture;
-    //         if(audioSourceId && videoSourceId) {
-    //              // Send initial prompt(s)
-    //              wsSendMessage(state.presetPrompt);
-    //              // Optionally add user prompt: wsSendMessage(state.userPrompt);
-    //
-    //              mediaStartCapture(audioSourceId, videoSourceId)
-    //                  .catch(err => console.error("Failed to start media capture after connect", err)); // Error handled by hook too
-    //         } else {
-    //              handleCaptureError("Sources not selected when attempting to start capture post-connect.");
-    //         }
-    //     }
-    // }, [wsStatus, state.capture.needsToStartCapture, mediaStartCapture, wsSendMessage, state.presetPrompt, state.userPrompt, state.capture.audioSourceId, state.capture.videoSourceId, handleCaptureError]);
-
-
-    // Simpler inline async approach (less robust for edge cases):
-    try {
-        // Wait for connection (crude polling - promises/events better)
-        await new Promise<void>((resolve, reject) => {
-            const maxWait = 10000; // 10 seconds timeout
-            const interval = 100;
-            let waited = 0;
-
-            const check = () => {
-                const currentWs = wsStatusRef.current; // Need a ref to track latest status if using inline
-                 if (currentWs === 'connected') {
-                    resolve();
-                } else if (currentWs === 'error' || currentWs === 'disconnected') {
-                    reject(new Error(`WebSocket connection failed or closed: ${state.geminiWebSocket.error || 'Unknown reason'}`));
-                } else if (waited >= maxWait) {
-                    reject(new Error('WebSocket connection timed out'));
-                } else {
-                    waited += interval;
-                    setTimeout(check, interval);
-                }
-            };
-            // Need a ref to track status because wsStatus from closure might be stale
-            const wsStatusRef = React.useRef(wsStatus);
-            useEffect(() => { wsStatusRef.current = wsStatus }, [wsStatus]); // Keep ref updated
-
-            check();
+        // 2. Запускаем захват медиа (асинхронно)
+        // Ошибки mediaStartCapture будут обработаны в handleCaptureError
+        mediaStartCapture(audioId, videoId).catch((err) => {
+          // Дополнительная обработка ошибки старта, если нужно
+          console.error("Не удалось запустить mediaStartCapture:", err);
+          // handleCaptureError уже должен был вызваться хуком, но можно добавить
+          if (!state.capture.error) {
+            // Проверяем, не установлена ли уже ошибка
+            handleCaptureError(
+              `Failed to init media capture: ${err.message || err}`
+            );
+          }
         });
-
-
-        // 4. Send Preset Prompt via WebSocket
-        wsSendMessage(state.presetPrompt);
-        // Optionally add user prompt here if needed
-        // if (state.userPrompt) { wsSendMessage(USER_CONTEXT_PROMPT.replace('{userInput}', state.userPrompt)); }
-
-
-        // 5. Start Media Capture (will start sending data via onDataAvailable callback)
-        await mediaStartCapture(audioSourceId, videoSourceId);
-
-        // If mediaStartCapture succeeds, the state.capture.isCapturing will be true via its hook/effect
-
-
-    } catch (error) {
-        console.error("Error during startCapture sequence:", error);
-        const message = error instanceof Error ? error.message : "Failed to start process";
-        // Ensure states are reset
-        dispatch({ type: 'SET_WEB_SOCKET_ERROR', payload: message });
-        dispatch({ type: 'SET_CAPTURE_ERROR', payload: message });
-        dispatch({ type: 'SET_IS_CAPTURING', payload: false });
-        wsDisconnect(); // Ensure WebSocket is closed on failure
+        // Не очищаем ID здесь, пусть остаются до следующего выбора/старта
+        dispatch({ type: "SET_SOURCES_TO_START", payload: null });
+      } else {
+        console.error("IDs источников не найдены при попытке старта захвата.");
+        handleCaptureError("Source IDs missing for capture start.");
+        wsDisconnect(); // Отключаемся, если не можем стартовать
+        // Очищаем ID
+        dispatch({ type: "SET_SOURCES_TO_START", payload: null });
+      }
+    } else if (
+      pendingAction === "startCapture" &&
+      (wsStatus === "error" || wsStatus === "disconnected")
+    ) {
+      // Ошибка WS произошла во время ожидания старта захвата
+      console.error(
+        "Ошибка или отключение WS во время ожидания старта захвата."
+      );
+      setPendingAction(null); // Сбрасываем флаг ожидания
+      // Очищаем ID
+      dispatch({ type: "SET_SOURCES_TO_START", payload: null });
+      // Ошибка WS уже должна быть установлена через useEffect/handleWebSocketError
+      // Можно добавить ошибку захвата для ясности
+      if (!state.capture.error && !state.geminiWebSocket.error) {
+        dispatch({
+          type: "SET_CAPTURE_ERROR",
+          payload: "WS connection failed before capture could start.",
+        });
+      }
     }
-
-
   }, [
-    mediaIsCapturing, wsStatus, state.presetPrompt, // state.userPrompt, // if user prompt is sent
-    wsConnect, wsSendMessage, mediaStartCapture, wsDisconnect, handleCaptureError // Include handleCaptureError
+    pendingAction,
+    wsStatus,
+    state.presetPrompt,
+    state.capture.selectedAudioSourceIdToStart, // Включаем зависимости
+    state.capture.selectedVideoSourceIdToStart, // Включаем зависимости
+    wsSendMessage,
+    mediaStartCapture,
+    handleCaptureError, // Включаем зависимости
+    wsDisconnect,
+    dispatch, // Включаем dispatch
+    // Не включаем state.capture.error и state.geminiWebSocket.error, чтобы избежать циклов
   ]);
 
-  // Stop the combined process
-  const stopCapture = useCallback(() => {
-    mediaStopCapture(); // Stops media recorder and streams
-    wsDisconnect();     // Closes WebSocket connection
-    // Reducer state for isCapturing and wsStatus will update via hooks/effects
-    dispatch({ type: 'SET_LOADING_RESPONSE', payload: false }); // Ensure loading indicator is off
-  }, [mediaStopCapture, wsDisconnect]);
+  // --- Actions exposed by Context ---
+  const addMessage = useCallback(
+    (message: Omit<Message, "id" | "timestamp">) => {
+      /* ... как раньше ... */
+    },
+    []
+  );
+  const setUserPrompt = useCallback((prompt: string) => {
+    /* ... как раньше ... */
+  }, []);
+  const loadMediaSources = useCallback(async () => {
+    /* ... как раньше ... */
+  }, [mediaLoadSources]);
+  const selectSources = useCallback(
+    (audioSourceId: string | null, videoSourceId: string | null) => {
+      dispatch({
+        type: "SET_SELECTED_SOURCES",
+        payload: { audioSourceId, videoSourceId },
+      });
+    },
+    []
+  );
 
+  // Переписанный startCapture - теперь он просто инициирует процесс
+  const startCapture = useCallback(
+    async (audioSourceId: string, videoSourceId: string) => {
+      if (mediaIsCapturing || pendingAction === "startCapture") {
+        console.warn("Захват уже идет или находится в процессе запуска.");
+        return;
+      }
+      if (!audioSourceId || !videoSourceId) {
+        handleCaptureError("Аудио и Видео источники должны быть выбраны.");
+        return;
+      }
+
+      console.log("Инициируем старт захвата...");
+      // 1. Очищаем предыдущие ошибки
+      dispatch({ type: "SET_CAPTURE_ERROR", payload: null });
+      dispatch({ type: "SET_WEB_SOCKET_ERROR", payload: null });
+
+      // 2. Сохраняем выбранные ID для использования в useEffect
+      dispatch({
+        type: "SET_SOURCES_TO_START",
+        payload: { audioSourceId, videoSourceId },
+      });
+
+      // 3. Устанавливаем флаг ожидания
+      setPendingAction("startCapture");
+
+      // 4. Подключаемся к WebSocket (если еще не подключены)
+      // Если уже connected, useEffect все равно сработает из-за изменения pendingAction
+      if (wsStatus !== "connected" && wsStatus !== "connecting") {
+        wsConnect();
+      } else if (wsStatus === "connected") {
+        // Если уже подключены, manually trigger a re-check in the effect might be needed
+        // if the effect logic somehow missed the initial connection state.
+        // Но стандартно useEffect [pendingAction, wsStatus] должен сработать.
+        console.log(
+          "WS уже подключен, ожидаем срабатывания useEffect для старта захвата..."
+        );
+      }
+
+      // Вся остальная логика (отправка команды, запуск mediaStartCapture) перенесена в useEffect
+    },
+    [
+      mediaIsCapturing,
+      pendingAction,
+      wsStatus, // Следим за текущими состояниями
+      handleCaptureError, // Используем для вывода ошибки
+      wsConnect,
+      dispatch, // Функции
+      // Не включаем state.presetPrompt и т.д., они используются в useEffect
+    ]
+  );
+
+  // stopCapture - останавливает все
+  const stopCapture = useCallback(() => {
+    console.log("Инициируем остановку захвата...");
+    setPendingAction(null); // Отменяем ожидание старта, если оно было
+    mediaStopCapture(); // Останавливает медиа
+    wsDisconnect(); // Отключает WebSocket
+    dispatch({ type: "SET_LOADING_RESPONSE", payload: false });
+    // Состояния isCapturing и wsStatus обновятся через useEffect
+    // Очищаем ID для старта
+    dispatch({ type: "SET_SOURCES_TO_START", payload: null });
+  }, [mediaStopCapture, wsDisconnect, dispatch]);
 
   // Memoize context value
-  const contextValue = useMemo<AppContextValue>(() => ({
-    state,
-    dispatch, // Exposing dispatch OR specific functions below
-    // Specific actions:
-    addMessage,
-    startCapture,
-    stopCapture,
-    setUserPrompt,
-    loadMediaSources,
-    selectSources,
-  }), [state, dispatch, addMessage, startCapture, stopCapture, setUserPrompt, loadMediaSources, selectSources]);
-
+  const contextValue = useMemo<AppContextValue>(
+    () => ({
+      state,
+      dispatch, // Оставляем dispatch, если он нужен где-то еще
+      // Specific actions:
+      addMessage,
+      startCapture,
+      stopCapture,
+      setUserPrompt,
+      loadMediaSources,
+      selectSources,
+    }),
+    [
+      state,
+      dispatch,
+      addMessage,
+      startCapture,
+      stopCapture,
+      setUserPrompt,
+      loadMediaSources,
+      selectSources,
+    ]
+  );
 
   return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
+    <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
   );
 };

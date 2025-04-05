@@ -1,5 +1,6 @@
 import React from "react";
-import "./ErrorDisplay.css"; // Add styling for errors
+// Удаляем импорт CSS-файла
+// import "./ErrorDisplay.css";
 
 interface ErrorDisplayProps {
   message: string | null;
@@ -12,7 +13,8 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ message }) => {
 
   return (
     <div className="error-display">
-      <p>Error: {message}</p>
+      <h3 className="error-display-title">Ошибка</h3>
+      <p className="error-display-message">{message}</p>
     </div>
   );
 };

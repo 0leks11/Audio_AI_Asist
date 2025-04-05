@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MediaSource } from "../../../../types";
-import { LoadingIndicator } from "../../../components/LoadingIndicator"; // Shared component
-import { ErrorDisplay } from "../../../components/ErrorDisplay"; // Shared component
-import "./ControlPanel.css";
+import { ErrorDisplay } from "../../../components/ErrorDisplay";
+import { LoadingIndicator } from "../../../components/LoadingIndicator";
 
 interface ControlPanelProps {
   isCapturing: boolean;
@@ -55,8 +54,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   // Load sources when the component mounts
   useEffect(() => {
     onLoadSources();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
+  }, []);
 
   const handleStartClick = () => {
     if (localAudioId && localVideoId) {
@@ -82,21 +80,40 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   const displayError = captureError || webSocketError;
 
+  // Определяем классы для статуса соединения
+  const getStatusClass = () => {
+    switch (webSocketStatus) {
+      case "connected":
+        return "status-connected";
+      case "connecting":
+        return "status-connecting";
+      case "error":
+        return "status-error";
+      default:
+        return "status-disconnected";
+    }
+  };
+
   return (
     <div className="control-panel">
+      <h2 className="control-panel-title">Управление записью</h2>
+
       {displayError && <ErrorDisplay message={displayError} />}
 
       <div className="source-selectors">
         <div className="source-selector">
-          <label htmlFor="audio-source">Audio Source:</label>
+          <label className="source-label" htmlFor="audio-source">
+            Источник аудио:
+          </label>
           <select
+            className="source-select"
             id="audio-source"
             value={localAudioId ?? ""}
             onChange={handleAudioChange}
             disabled={isCapturing || isLoadingSources}
           >
             <option value="">
-              {isLoadingSources ? "Loading..." : "Select Audio..."}
+              {isLoadingSources ? "Загрузка..." : "Выберите источник аудио..."}
             </option>
             {availableAudioSources.map((source) => (
               <option key={source.id} value={source.id}>
@@ -105,16 +122,20 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             ))}
           </select>
         </div>
+
         <div className="source-selector">
-          <label htmlFor="video-source">Video Source:</label>
+          <label className="source-label" htmlFor="video-source">
+            Источник видео:
+          </label>
           <select
+            className="source-select"
             id="video-source"
             value={localVideoId ?? ""}
             onChange={handleVideoChange}
             disabled={isCapturing || isLoadingSources}
           >
             <option value="">
-              {isLoadingSources ? "Loading..." : "Select Video..."}
+              {isLoadingSources ? "Загрузка..." : "Выберите источник видео..."}
             </option>
             {availableVideoSources.map((source) => (
               <option key={source.id} value={source.id}>
@@ -123,12 +144,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             ))}
           </select>
         </div>
-        {isLoadingSources && (
-          <LoadingIndicator size="small" text="Loading sources..." />
-        )}
       </div>
 
-      <div className="action-buttons">
+      {isLoadingSources && (
+        <LoadingIndicator size="small" text="Загрузка источников..." />
+      )}
+
+      <div className="control-buttons">
         {!isCapturing ? (
           <button
             onClick={handleStartClick}
@@ -140,28 +162,31 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             }
           >
             {webSocketStatus === "connecting"
-              ? "Connecting..."
-              : "Start Capture"}
+              ? "Подключение..."
+              : "Начать запись"}
           </button>
         ) : (
           <button
             onClick={onStopCapture}
             disabled={webSocketStatus === "connecting"}
           >
-            Stop Capture
+            Остановить запись
           </button>
         )}
         <button
           onClick={onLoadSources}
           disabled={isLoadingSources || isCapturing}
         >
-          Refresh Sources
+          Обновить источники
         </button>
       </div>
+
       <div className="status-indicator">
-        <span>Capture: {isCapturing ? "Active" : "Inactive"}</span>
-        <span> | </span>
-        <span>Connection: {webSocketStatus}</span>
+        <div className={`status-dot ${getStatusClass()}`}></div>
+        <span>
+          Статус: {isCapturing ? "Запись активна" : "Готов к записи"} |
+          Соединение: {webSocketStatus}
+        </span>
       </div>
     </div>
   );

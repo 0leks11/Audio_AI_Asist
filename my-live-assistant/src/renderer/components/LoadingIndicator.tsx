@@ -1,5 +1,6 @@
 import React from "react";
-import "./LoadingIndicator.css"; // Add some basic spinner styling
+// Удаляем импорт CSS-файла
+// import "./LoadingIndicator.css";
 
 interface LoadingIndicatorProps {
   size?: "small" | "medium" | "large";
@@ -8,13 +9,12 @@ interface LoadingIndicatorProps {
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   size = "medium",
-  text,
+  text = "Загрузка...",
 }) => {
-  const sizeClass = `loading-indicator--${size}`;
   return (
-    <div className={`loading-indicator ${sizeClass}`}>
-      <div className="spinner"></div>
-      {text && <span className="loading-text">{text}</span>}
+    <div className={`loading-indicator loading-${size}`}>
+      <div className="loading-spinner"></div>
+      <p className="loading-text">{text}</p>
     </div>
   );
 };

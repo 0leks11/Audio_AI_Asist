@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from "react";
 import { Message } from "../../../../types";
 import { MessageItem } from "./MessageItem";
 import { LoadingIndicator } from "../../../components/LoadingIndicator"; // Shared component
-import "./ChatWindow.css"; // Add basic styling
 
 interface ChatWindowProps {
   messages: Message[];
@@ -23,19 +22,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(
 
     return (
       <div className="chat-window">
-        <div className="message-list">
-          {messages.map((msg) => (
-            <MessageItem key={msg.id} message={msg} />
-          ))}
-          {isLoading && (
-            <div className="loading-container">
-              <LoadingIndicator size="small" />
-            </div>
-          )}
-          {/* Anchor for scrolling */}
-          <div ref={messagesEndRef} />
-        </div>
+        {messages.length > 0 ? (
+          <div className="chat-messages">
+            {messages.map((msg) => (
+              <MessageItem key={msg.id} message={msg} />
+            ))}
+            {isLoading && (
+              <div className="loading-container">
+                <LoadingIndicator size="small" text="Обработка..." />
+              </div>
+            )}
+            {/* Anchor for scrolling */}
+            <div ref={messagesEndRef} />
+          </div>
+        ) : (
+          <div className="chat-empty">
+            Начните запись, чтобы получить расшифровку и ответы от AI
+          </div>
+        )}
       </div>
     );
   }
 );
+
+ChatWindow.displayName = "ChatWindow";
