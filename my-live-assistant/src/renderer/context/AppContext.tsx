@@ -88,8 +88,20 @@ const appReducer = (state: AppState, action: Action): AppState => {
       break;
     case "SET_MEDIA_SOURCES_LOADING" /* ... */:
       break;
-    case "SET_MEDIA_SOURCES" /* ... */:
-      break;
+    case "SET_MEDIA_SOURCES":
+      // Логгируем перед изменением состояния
+      console.log("[Reducer] Обновление источников:", action.payload);
+      return {
+        // Возвращаем НОВЫЙ объект state
+        ...state,
+        capture: {
+          // Создаем НОВЫЙ объект capture
+          ...state.capture,
+          availableAudioSources: action.payload.audio,
+          availableVideoSources: action.payload.video,
+          isLoadingSources: false, // Убедимся, что сбрасываем флаг загрузки
+        },
+      };
     case "SET_SELECTED_SOURCES" /* ... */:
       break;
     // Обрабатываем новое действие

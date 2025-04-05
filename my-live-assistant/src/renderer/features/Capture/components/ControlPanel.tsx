@@ -34,8 +34,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   onLoadSources,
   onSelectSources,
 }) => {
-  // Логируем полученные пропсы источников
-  console.log("[ControlPanel] Полученные пропсы источников:", {
+  // Логируем полученные пропсы источников при КАЖДОМ рендере
+  console.log("[ControlPanel] РЕНДЕР. Пропсы источников:", {
     availableAudioSources,
     availableVideoSources,
   });
