@@ -168,9 +168,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const handleWebSocketMessage = useCallback(
     (data: string | ArrayBuffer | Blob) => {
       if (typeof data === "string") {
+        console.log(
+          "[handleWebSocketMessage] Получены строковые данные:",
+          data
+        );
         try {
           const message = JSON.parse(data);
-          console.log("Сообщение от бэкенда:", message);
+          console.log(
+            "[handleWebSocketMessage] Сообщение от бэкенда (JSON):",
+            message
+          );
 
           if (message.type === "text_response") {
             dispatch({
@@ -178,39 +185,50 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
               payload: { text: message.content, sender: "gemini" },
             });
             dispatch({ type: "SET_LOADING_RESPONSE", payload: false });
-            dispatch({ type: "SET_WEB_SOCKET_ERROR", payload: null }); // Очистка ошибки при успехе
+            dispatch({ type: "SET_WEB_SOCKET_ERROR", payload: null });
           } else if (message.type === "session_started") {
-            console.log("Бэкенд подтвердил старт сессии Gemini.");
-            // Можно обновить UI, если необходимо
+            console.log(
+              "[handleWebSocketMessage] Бэкенд подтвердил старт сессии Gemini."
+            );
+          } else if (message.type === "connected") {
+            console.log(
+              "[handleWebSocketMessage] Бэкенд подтвердил подключение."
+            );
           } else if (message.type === "session_stopped") {
-            console.log("Бэкенд подтвердил остановку сессии Gemini.");
-            // Можно обновить UI
+            console.log(
+              "[handleWebSocketMessage] Бэкенд подтвердил остановку сессии Gemini."
+            );
           } else if (message.type === "error") {
-            console.error("Ошибка от бэкенда:", message.message);
+            console.error(
+              "[handleWebSocketMessage] Ошибка от бэкенда:",
+              message.message
+            );
             dispatch({
               type: "SET_WEB_SOCKET_ERROR",
               payload: `Backend: ${message.message}`,
             });
             dispatch({ type: "SET_LOADING_RESPONSE", payload: false });
-            // Если ошибка критическая, возможно, стоит остановить захват?
-            // mediaStopCapture(); // Вызовет stopCapture ниже
-            // setPendingAction(null); // Отменяем ожидание старта
+          } else {
+            console.warn(
+              "[handleWebSocketMessage] Получен неизвестный тип JSON сообщения:",
+              message
+            );
           }
-          // ... обработка других сообщений ...
         } catch (error) {
-          console.error("Не удалось распарсить JSON от бэкенда:", data, error);
-          // Можно отправить общую ошибку парсинга
-          dispatch({
-            type: "SET_WEB_SOCKET_ERROR",
-            payload: "Invalid message format from backend",
-          });
+          console.warn(
+            `[handleWebSocketMessage] Не удалось распарсить строку как JSON (возможно, это не JSON?): "${data}"`,
+            error
+          );
         }
       } else {
-        console.warn("Получены неожиданные бинарные данные от бэкенда.");
+        console.warn(
+          "[handleWebSocketMessage] Получены бинарные данные от бэкенда.",
+          data
+        );
       }
     },
     [dispatch]
-  ); // Убрали mediaStopCapture из зависимостей, если он не используется напрямую
+  );
 
   const handleWebSocketError = useCallback(
     (error: Event | string) => {

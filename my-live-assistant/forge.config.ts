@@ -4,7 +4,7 @@ import { MakerZIP } from "@electron-forge/maker-zip";
 import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerRpm } from "@electron-forge/maker-rpm";
 import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-natives";
-import { WebpackPlugin } from "@electron-forge/plugin-webpack";
+import { WebpackPlugin } from "@electron-forge/plugin-webpack"; // Убедитесь, что импорт есть
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 
@@ -25,6 +25,7 @@ const config: ForgeConfig = {
   plugins: [
     new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({
+      // <-- Начинается конфигурация WebpackPlugin
       mainConfig,
       renderer: {
         config: rendererConfig,
@@ -34,14 +35,21 @@ const config: ForgeConfig = {
             js: "./src/renderer.tsx",
             name: "main_window",
             preload: {
-              js: "./src/preload.ts",
+              js: "./src/main/preload.ts", // Убедитесь, что это правильный путь
             },
           },
         ],
       },
-    }),
-    // Fuses are used to enable/disable various Electron functionality
-    // at package time, before code signing the application
+
+      // ---- ДОБАВЬТЕ ЭТО ПОЛЕ ----
+      devContentSecurityPolicy: `default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-eval'; connect-src 'self' ws://localhost:*; img-src 'self' data:; font-src 'self';`,
+      // ---------------------------
+
+      // Можно также явно указать порт, если он отличается от дефолтного
+      // port: 3000,
+      // loggerPort: 9000,
+    }), // <-- Заканчивается конфигурация WebpackPlugin
+    // Fuses plugin...
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,
